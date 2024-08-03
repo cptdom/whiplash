@@ -1,6 +1,6 @@
+use futures;
 use std::env;
 use std::error::Error;
-use std::sync::Arc;
 
 use log::{error, info, warn};
 
@@ -22,29 +22,37 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     // load the config using the path
     let config = config::Config::from_file(config_path)?;
-    let config_clone = Arc::clone(&config);
-    let config = config.lock().unwrap();
+    // Clone config data
+    let symbols = config.symbols.clone();
+    let atr_threshold = config.atr_threshold;
+    let atr_min_candles_percent = config.atr_min_candles_percent;
+    let min_vol_usdt = config.min_vol_usdt;
     info!("found configuration: {:?}", config);
 
-
+    let mut handles = vec![];
     // for each configured symbol, run the collect & monitor loop
-    for symbol in config.symbols.clone() {
+    for symbol in symbols {
+        info!("init data for {}", symbol);
         // unwrap config here
-        let c = config_clone.lock().unwrap();
         let handler = stream_monitor::SymbolData::new(
             symbol.as_str(),
-            c.atr_threshold,
-            c.atr_min_candles_percent,
-            c.min_vol_usdt,
+            atr_threshold,
+            atr_min_candles_percent,
+            min_vol_usdt,
         );
-        tokio::spawn(async move {
+        let outer_handle = tokio::spawn(async move {
+            info!("starting monitoring loop for {}", symbol);
             if let Err(e) = stream_monitor::run(handler).await {
                 error!("failed to start handler for {}: {:?}", symbol, e)
             }
         });
+        handles.push(outer_handle);
     }
 
     // run until interrupted
+    if let Err(e) = futures::future::try_join_all(handles).await {
+        error!("failed to run the orchestra: {:?}", e);
+    }
     tokio::signal::ctrl_c().await?;
 
     Ok(())

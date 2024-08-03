@@ -1,3 +1,4 @@
+use anyhow::Result;
 use async_std::task;
 use buffer::BufferNode;
 use circular_buffer::CircularBuffer;
@@ -5,9 +6,9 @@ use event::Event;
 use futures_util::StreamExt;
 use log::{error, info, debug};
 use serde_json;
-use std::error::Error;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::time::{interval, Duration};
+use tokio::sync::Mutex;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::protocol::Message;
 
@@ -17,7 +18,8 @@ mod atr;
 
 static FUTURES_URL: &str = "wss://fstream.binance.com/ws";
 static STREAM_TYPE: &str = "kline_1m";
-const ATR_CHECK_WINDOW: usize = 60;
+const ATR_CHECK_WINDOW_SECONDS: usize = 1;
+const WARMUP_WINDOW_SECONDS: usize = 60;
 
 pub struct SymbolData {
     pub symbol:  String,
@@ -42,9 +44,9 @@ impl SymbolData {
     }
 }
 
-pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<(), Box<dyn Error>> {
+pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<()> {
     let url = {
-        let handler = handler.lock().unwrap();
+        let handler = handler.lock().await;
         format!("{}/{}@{}", FUTURES_URL, handler.symbol.to_lowercase(), STREAM_TYPE)
     };
 
@@ -74,7 +76,7 @@ pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<(), Box<dyn Error>> 
                             match BufferNode::from_kline_event(&parsed_message) {
                                 Ok(node) => {
                                     debug!("appending node: {:?}", node);
-                                    let mut handler = collection_clone.lock().unwrap();
+                                    let mut handler = collection_clone.lock().await;
                                     handler.buffer.push_front(node);
                                 }
                                 Err(e) => {
@@ -96,27 +98,29 @@ pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<(), Box<dyn Error>> 
     });
 
     let monitoring_clone = Arc::clone(&handler);
-    let handler = handler.lock().unwrap();
+    let handler = handler.lock().await;
     let s = handler.symbol.clone();
     let at = handler.atr_threshold.clone();
     let am = handler.atr_min_candles_percent.clone();
+
+    drop(handler);
     let monitoring_handle = tokio::spawn(async move {
-        let mut interval = interval(Duration::from_secs(60));
-        info!("allowing {:?} seconds to populate buffers...", ATR_CHECK_WINDOW);
-        task::sleep(Duration::from_secs(ATR_CHECK_WINDOW as u64)).await;
+        let mut interval = interval(Duration::from_secs(1));
+        info!("allowing {:?} seconds to populate buffers...", WARMUP_WINDOW_SECONDS);
+        task::sleep(Duration::from_secs(WARMUP_WINDOW_SECONDS as u64)).await;
         loop {
             interval.tick().await;
-            let mut handler = monitoring_clone.lock().unwrap();
+            let mut handler = monitoring_clone.lock().await;
             // calculate atr
             let atr_result = atr::check_atr_condition(
                 &s,
                 &mut handler.buffer, // Mutable reference to buffer
-                ATR_CHECK_WINDOW,
+                ATR_CHECK_WINDOW_SECONDS,
                 at,
                 am
             );
             // get volume delta for the period
-            let vol_usdt = buffer::calc_volume_delta(&mut handler.buffer, ATR_CHECK_WINDOW as i64);
+            let vol_usdt = buffer::calc_volume_delta(&mut handler.buffer, ATR_CHECK_WINDOW_SECONDS as i64);
 
             // Handle the ATR result as needed
             match atr_result {
@@ -135,7 +139,7 @@ pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<(), Box<dyn Error>> 
         }
     });
 
-    tokio::join!(collection_handle, monitoring_handle);
+    let _ = tokio::try_join!(collection_handle, monitoring_handle);
 
     Ok(())
 }

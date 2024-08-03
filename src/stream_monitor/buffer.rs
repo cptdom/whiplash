@@ -1,7 +1,7 @@
+use anyhow::Result;
 use circular_buffer::CircularBuffer;
 use chrono::{DateTime, Duration, Utc};
 use super::event::Event;
-use std::error::Error;
 
 
 #[derive(Debug, Clone)]
@@ -18,10 +18,10 @@ const BUFFER_SIZE: usize = (60 + 1) * 4;
 pub type SymbolBuffer = CircularBuffer<BUFFER_SIZE, BufferNode>;
 
 impl BufferNode {
-    pub fn from_kline_event(event: &Event) -> Result<Self, Box<dyn Error>> {
+    pub fn from_kline_event(event: &Event) -> Result<Self> {
         let (kline_volume, close_price) = parse_kline_event(event)?;
         let ts = chrono::DateTime::from_timestamp_millis(event.E as i64)
-            .ok_or("invalid timestamp")?
+            .ok_or_else(|| anyhow::anyhow!("invalid timestamp received"))?
             .to_utc();
 
         let node: BufferNode = BufferNode {
@@ -35,7 +35,7 @@ impl BufferNode {
     }
 }
 
-fn parse_kline_event(event: &Event) -> Result<(f64, f64), Box<dyn Error>> {
+fn parse_kline_event(event: &Event) -> Result<(f64, f64)> {
     let price_high: f64 = event.k.h.parse()?;
     let price_low: f64 = event.k.h.parse()?;
     let price_close: f64 = event.k.h.parse()?;
