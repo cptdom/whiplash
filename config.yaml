@@ -1,0 +1,9 @@
+atr_moving_average_type: ""
+atr_threshold: 0.2
+atr_min_candles_percent: 0.8
+min_vol_usdt: 50000
+
+symbols:
+  - "ETHUSDT"
+  - "DOGEUSDT"
+  - "SHIBUSDT"
