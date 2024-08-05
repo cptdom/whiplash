@@ -8,6 +8,7 @@ The market is monitored using Binance's websocket symbol-specific stream. The go
 
 ### but why?
 I wanted a Rust exercise with a real use-case. This project at the moment is nothing but me trying to advance my understanding of Rust.
+
 **NOTE:** Right now, the project is just a feature rewrite and is probably not very Rust-y. I suggest not taking it as an example of any kind.
 
 ### usage
