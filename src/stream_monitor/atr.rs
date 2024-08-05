@@ -363,4 +363,13 @@ fn test_get_atr_data_cross() {
 #[test]
 fn test_atr_ema() {
 
+    let highs = vec![100.5, 100.5, 100.5, 100.5, 100.5, 100.5, 100.5, 100.5, 100.5, 100.5];
+    let lows = vec![99.5, 99.5, 99.5, 99.5, 99.5, 99.5, 99.5, 99.5, 99.5, 99.5];
+    let closes = vec![100., 100., 100., 100., 100., 100., 100., 100., 100., 100.];
+
+    let result = atr_ema(highs.as_slice(), lows.as_slice(), closes.as_slice(), 5);
+    let rounded_result = (result[result.len()-1] * 1000.).round() / 1000.;
+
+    assert!(result.len() == 10);
+    assert!(rounded_result == 0.945);
 }
