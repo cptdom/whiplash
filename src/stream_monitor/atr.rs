@@ -1,9 +1,7 @@
-use std::sync::mpsc::RecvTimeoutError;
-use std::{collections::HashMap, os::linux::raw::stat};
+use std::collections::HashMap;
 use std::error::Error;
 use super::buffer::SymbolBuffer;
 use chrono::{Duration, Timelike, Utc};
-use circular_buffer::CircularBuffer;
 
 #[derive(Debug)]
 pub struct ATRInputData {
@@ -14,7 +12,6 @@ pub struct ATRInputData {
 
 
 pub fn check_atr_condition(
-    symbol: &String,
     buffer: &mut SymbolBuffer,
     seconds: usize,
     atr_threshold: f64,
@@ -45,22 +42,11 @@ pub fn check_atr_condition(
 
     let is_atr_limit_passed = (calculated_atr / close_price) > (atr_threshold / 100.0);
 
-    // Log the result (assuming a logging system is available)
-    log::debug!(
-        "symbol: {}, atr: {}, close_price: {}, atr_min_percent: {}, atr_value: {}",
-        symbol,
-        calculated_atr,
-        close_price,
-        atr_threshold,
-        is_atr_limit_passed
-    );
-
-
     Ok((is_atr_limit_passed, calculated_atr))
 }
 
 fn calculate_atr(input: &ATRInputData, seconds: usize) -> Result<f64, Box<dyn Error>>{
-    let atr_arr = atr_ema(&input.highs, &input.lows, &input.closes, seconds);
+    let atr_arr = atr_ema(&input.highs, &input.lows, &input.closes, seconds-1);
     let length  = atr_arr.len();
     if length != 0 {
         Ok(atr_arr[length-1])
@@ -165,7 +151,7 @@ pub fn atr_ema(in_high: &[f64], in_low: &[f64], in_close: &[f64], in_time_period
     let mut prev_atr = prev_atr_temp[in_time_period];
     out_real[in_time_period] = prev_atr;
 
-    let mut out_idx = in_time_period + 1;
+    let mut out_idx = in_time_period+1;
     let mut today = in_time_period + 1;
 
     while out_idx < in_close.len() {
@@ -227,7 +213,7 @@ pub fn true_range(in_high: &[f64], in_low: &[f64], in_close: &[f64]) -> Vec<f64>
         let temp_ht = in_high[today];
         let temp_cy = in_close[today - 1];
 
-        let greatest = f64::max(temp_ht - temp_lt, f64::max((temp_ht - temp_cy).abs(), (temp_lt - temp_cy).abs()));
+        let greatest = f64::max(temp_ht - temp_lt, f64::max((temp_cy - temp_ht).abs(), (temp_cy - temp_lt).abs()));
 
         out_real[today] = greatest;
         today += 1;
@@ -241,6 +227,7 @@ pub fn true_range(in_high: &[f64], in_low: &[f64], in_close: &[f64]) -> Vec<f64>
 fn test_get_atr_data() {
 
     use super::BufferNode;
+    use circular_buffer::CircularBuffer;
     // get current time and round it to full seconds so that we have clean start
     let start_time = Utc::now();
     let nanos_to_deduct = start_time.timestamp_subsec_nanos() as i64;
@@ -298,6 +285,7 @@ fn test_get_atr_data() {
 fn test_get_atr_data_cross() {
 
     use super::BufferNode;
+    use circular_buffer::CircularBuffer;
     // get current time and round it to full seconds so that we have clean start
     let start_time = Utc::now();
     let nanos_to_deduct = start_time.timestamp_subsec_nanos() as i64;

@@ -18,7 +18,7 @@ mod atr;
 
 static FUTURES_URL: &str = "wss://fstream.binance.com/ws";
 static STREAM_TYPE: &str = "kline_1m";
-const ATR_CHECK_WINDOW_SECONDS: usize = 1;
+const ATR_CHECK_WINDOW_SECONDS: usize = 10; // TODO: configurable per symbol
 const WARMUP_WINDOW_SECONDS: usize = 60;
 
 pub struct SymbolData {
@@ -116,7 +116,6 @@ pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<()> {
             let mut handler = monitoring_clone.lock().await;
             // calculate atr
             let atr_result = atr::check_atr_condition(
-                &s,
                 &mut handler.buffer, // Mutable reference to buffer
                 ATR_CHECK_WINDOW_SECONDS,
                 at,
