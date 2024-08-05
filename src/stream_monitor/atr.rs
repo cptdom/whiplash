@@ -17,7 +17,6 @@ pub fn check_atr_condition(
     atr_threshold: f64,
     atr_min_candles_percent: f64
 ) -> Result<(bool, f64), Box<dyn Error>> {
-    // Get ATR data
     let atr_input = get_atr_data(buffer, seconds)?;
 
     let mut seconds_to_fetch = seconds;

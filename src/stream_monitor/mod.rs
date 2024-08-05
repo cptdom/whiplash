@@ -104,6 +104,7 @@ pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<()> {
     let s = handler.symbol.clone();
     let at = handler.atr_threshold.clone();
     let am = handler.atr_min_candles_percent.clone();
+    let mv = handler.min_vol_usdt.clone();
     // explicitly drop the lock becasue it needs to be
     drop(handler);
 
@@ -113,22 +114,24 @@ pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<()> {
         task::sleep(Duration::from_secs(WARMUP_WINDOW_SECONDS as u64)).await;
         loop {
             interval.tick().await;
-            let mut handler = monitoring_clone.lock().await;
+            let handler = monitoring_clone.lock().await;
+            let mut buffer_copy = handler.buffer.clone();
+            drop(handler);
             // calculate atr
             let atr_result = atr::check_atr_condition(
-                &mut handler.buffer, // Mutable reference to buffer
+                &mut buffer_copy, // Mutable reference to buffer
                 ATR_CHECK_WINDOW_SECONDS,
                 at,
                 am
             );
             // get volume delta for the period
-            let vol_usdt = buffer::calc_volume_delta(&mut handler.buffer, ATR_CHECK_WINDOW_SECONDS as i64);
+            let vol_usdt = buffer::calc_volume_delta(&mut buffer_copy, ATR_CHECK_WINDOW_SECONDS as i64);
 
             // Handle the ATR result as needed
             match atr_result {
                 Ok((limit_passed, val)) => {
                    // TODO: this is to be changed based on the action we want to take
-                   if limit_passed && vol_usdt >= handler.min_vol_usdt {
+                   if limit_passed && vol_usdt >= mv {
                     info!("SYMBOL {} READY FOR TRADE RUN, ATR: {:?}, VOLUME: {:?}", &s, val, vol_usdt)
                    } else {
                     info!("symbol {} idle, atr: {:?}, volume: {:?}", &s, val, vol_usdt)
