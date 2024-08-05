@@ -77,7 +77,9 @@ pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<()> {
                                 Ok(node) => {
                                     debug!("appending node: {:?}", node);
                                     let mut handler = collection_clone.lock().await;
-                                    handler.buffer.push_front(node);
+                                    handler.buffer.push_back(node);
+                                    // don't have to explicitly drop the lock because it goes out of the scope
+                                    // and the lock is gone implicitly
                                 }
                                 Err(e) => {
                                     error!("failed to create BufferNode: {:?}", e);
@@ -102,8 +104,9 @@ pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<()> {
     let s = handler.symbol.clone();
     let at = handler.atr_threshold.clone();
     let am = handler.atr_min_candles_percent.clone();
-
+    // explicitly drop the lock becasue it needs to be
     drop(handler);
+
     let monitoring_handle = tokio::spawn(async move {
         let mut interval = interval(Duration::from_secs(1));
         info!("allowing {:?} seconds to populate buffers...", WARMUP_WINDOW_SECONDS);

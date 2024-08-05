@@ -1,7 +1,9 @@
-use std::collections::HashMap;
+use std::sync::mpsc::RecvTimeoutError;
+use std::{collections::HashMap, os::linux::raw::stat};
 use std::error::Error;
 use super::buffer::SymbolBuffer;
 use chrono::{Duration, Timelike, Utc};
+use circular_buffer::CircularBuffer;
 
 #[derive(Debug)]
 pub struct ATRInputData {
@@ -232,4 +234,133 @@ pub fn true_range(in_high: &[f64], in_low: &[f64], in_close: &[f64]) -> Vec<f64>
     }
 
     out_real
+}
+
+// TESTS
+#[test]
+fn test_get_atr_data() {
+
+    use super::BufferNode;
+    // get current time and round it to full seconds so that we have clean start
+    let start_time = Utc::now();
+    let nanos_to_deduct = start_time.timestamp_subsec_nanos() as i64;
+    let start_time = start_time - Duration::nanoseconds(nanos_to_deduct);
+    // we'll try to get the data for the last second
+    // and make sure our nodes cross the boundary at some point
+    let node1 = BufferNode {
+        value: 45.,
+        ts: start_time - Duration::milliseconds(50),
+        confirmed: true,
+        close_price: 55.,
+    };
+    let node2 = BufferNode {
+        value: 44.,
+        ts: start_time - Duration::milliseconds(250),
+        confirmed: false,
+        close_price: 59.,
+    };
+    let node3 = BufferNode {
+        value: 43.,
+        ts: start_time - Duration::milliseconds(450),
+        confirmed: false,
+        close_price: 53.,
+    };
+    let node4 = BufferNode {
+        value: 42.,
+        ts: start_time - Duration::milliseconds(650),
+        confirmed: false,
+        close_price: 52.,
+    };
+    let node5 = BufferNode {
+        value: 41.,
+        ts: start_time - Duration::milliseconds(1050),
+        confirmed: true,
+        close_price: 51.,
+    };
+
+    let nodes = vec![node5, node4, node3, node2, node1];
+    let mut buffer = CircularBuffer::<244, BufferNode>::new();
+
+    for node in nodes {
+        buffer.push_back(node)
+    }
+
+    let recv_atr_data = get_atr_data(&mut buffer, 1).unwrap();
+
+    assert!(recv_atr_data.closes.len() == 1);
+    assert!(recv_atr_data.closes == vec![55.]);
+    assert!(recv_atr_data.highs == vec![59.]);
+    assert!(recv_atr_data.lows == vec![52.]);
+
+}
+
+#[test]
+fn test_get_atr_data_cross() {
+
+    use super::BufferNode;
+    // get current time and round it to full seconds so that we have clean start
+    let start_time = Utc::now();
+    let nanos_to_deduct = start_time.timestamp_subsec_nanos() as i64;
+    let start_time = start_time - Duration::nanoseconds(nanos_to_deduct) + Duration::milliseconds(500);
+    // we'll try to get the data for the last second
+    // and make sure our nodes cross the boundary twice
+    let node1 = BufferNode {
+        value: 45.,
+        ts: start_time - Duration::milliseconds(50),
+        confirmed: false,
+        close_price: 55.,
+    };
+    let node2 = BufferNode {
+        value: 44.,
+        ts: start_time - Duration::milliseconds(250),
+        confirmed: false,
+        close_price: 59.,
+    };
+    // nodes from 2nd second, but still close enough
+    let node3 = BufferNode {
+        value: 43.,
+        ts: start_time - Duration::milliseconds(550),
+        confirmed: true,
+        close_price: 53.,
+    };
+    let node4 = BufferNode {
+        value: 42.,
+        ts: start_time - Duration::milliseconds(650),
+        confirmed: false,
+        close_price: 52.,
+    };
+    // node from 2nd second, but out of interval
+    let node5 = BufferNode {
+        value: 42.,
+        ts: start_time - Duration::milliseconds(1050),
+        confirmed: false,
+        close_price: 52.,
+    };
+    // node from 3rd second, should be omitted
+    let node6 = BufferNode {
+        value: 41.,
+        ts: start_time - Duration::milliseconds(1550),
+        confirmed: true,
+        close_price: 51.,
+    };
+
+    let nodes = vec![node6, node5, node4, node3, node2, node1];
+    let mut buffer = CircularBuffer::<244, BufferNode>::new();
+
+    for node in nodes {
+        buffer.push_back(node)
+    }
+
+    let recv_atr_data = get_atr_data(&mut buffer, 1).unwrap();
+
+    assert!(recv_atr_data.closes.len() == 2);
+    assert!(recv_atr_data.closes == vec![53., 55.0]);
+    assert!(recv_atr_data.highs == vec![53., 59.]);
+    assert!(recv_atr_data.lows == vec![52., 55.]);
+
+}
+
+#[test]
+fn test_atr_ema() {
+
 }
