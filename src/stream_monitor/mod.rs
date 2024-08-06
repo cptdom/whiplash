@@ -110,7 +110,7 @@ pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<()> {
 
     let monitoring_handle = tokio::spawn(async move {
         let mut interval = interval(Duration::from_secs(1));
-        info!("allowing {:?} seconds to populate buffers...", WARMUP_WINDOW_SECONDS);
+        info!("allowing {:?} seconds to populate buffer for {}", WARMUP_WINDOW_SECONDS, s);
         task::sleep(Duration::from_secs(WARMUP_WINDOW_SECONDS as u64)).await;
         loop {
             interval.tick().await;
@@ -132,9 +132,9 @@ pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<()> {
                 Ok((limit_passed, val)) => {
                    // TODO: this is to be changed based on the action we want to take
                    if limit_passed && vol_usdt >= mv {
-                    info!("SYMBOL {} READY FOR TRADE RUN, ATR: {:?}, VOLUME: {:?}", &s, val, vol_usdt)
+                    info!("SYMBOL {} READY FOR TRADE RUN, ATR: {:.3}, VOLUME: {:.3}", &s, val, vol_usdt)
                    } else {
-                    info!("symbol {} idle, atr: {:?}, volume: {:?}", &s, val, vol_usdt)
+                    info!("symbol {} idle, atr: {:.3}, volume: {:.3}", &s, val, vol_usdt)
                    }
                 }
                 Err(e) => {

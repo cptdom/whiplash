@@ -273,10 +273,10 @@ fn test_get_atr_data() {
 
     let recv_atr_data = get_atr_data(&mut buffer, 1).unwrap();
 
-    assert!(recv_atr_data.closes.len() == 1);
-    assert!(recv_atr_data.closes == vec![55.]);
-    assert!(recv_atr_data.highs == vec![59.]);
-    assert!(recv_atr_data.lows == vec![52.]);
+    assert_eq!(recv_atr_data.closes.len(), 1);
+    assert_eq!(recv_atr_data.closes, vec![55.]);
+    assert_eq!(recv_atr_data.highs, vec![59.]);
+    assert_eq!(recv_atr_data.lows, vec![52.]);
 
 }
 
@@ -340,10 +340,10 @@ fn test_get_atr_data_cross() {
 
     let recv_atr_data = get_atr_data(&mut buffer, 1).unwrap();
 
-    assert!(recv_atr_data.closes.len() == 2);
-    assert!(recv_atr_data.closes == vec![53., 55.0]);
-    assert!(recv_atr_data.highs == vec![53., 59.]);
-    assert!(recv_atr_data.lows == vec![52., 55.]);
+    assert_eq!(recv_atr_data.closes.len(), 2);
+    assert_eq!(recv_atr_data.closes, vec![53., 55.0]);
+    assert_eq!(recv_atr_data.highs, vec![53., 59.]);
+    assert_eq!(recv_atr_data.lows, vec![52., 55.]);
 
 }
 
@@ -357,6 +357,6 @@ fn test_atr_ema() {
     let result = atr_ema(highs.as_slice(), lows.as_slice(), closes.as_slice(), 5);
     let rounded_result = (result[result.len()-1] * 1000.).round() / 1000.;
 
-    assert!(result.len() == 10);
-    assert!(rounded_result == 0.945);
+    assert_eq!(result.len(), 10);
+    assert_eq!(rounded_result, 0.945);
 }

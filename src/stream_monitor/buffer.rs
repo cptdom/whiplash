@@ -4,7 +4,7 @@ use chrono::{DateTime, Duration, Utc};
 use super::event::Event;
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BufferNode {
     pub value: f64,
     pub ts: DateTime<Utc>,
@@ -81,9 +81,82 @@ pub fn calc_volume_delta(buffer: &mut SymbolBuffer, needed_seconds: i64) -> f64 
 
     // restore the buffer to its original state by re-pushing the popped nodes
     while let Some(node) = temp_nodes.pop() {
-        buffer.push_front(node);
+        buffer.push_back(node);
     }
 
     total_volume_delta
 }
 
+
+// TESTS
+#[test]
+fn test_calc_volume_data() {
+    let latest_timestamp = Utc::now();
+
+    // this node should be excluded
+    let node0 = BufferNode {
+        ts: latest_timestamp - Duration::milliseconds(2050),
+        value: 0.1,
+        confirmed: false,
+        close_price:42.
+    };
+    let node1 = BufferNode {
+        ts: latest_timestamp - Duration::milliseconds(1550),
+        value: 1.0,
+        confirmed: false,
+        close_price:42.
+    };
+    let node2 = BufferNode {
+        ts: latest_timestamp - Duration::milliseconds(1300),
+        value: 2.0,
+        confirmed: false,
+        close_price:42.
+    };
+    let node3 = BufferNode {
+        ts: latest_timestamp - Duration::milliseconds(1050),
+        value: 3.0,
+        confirmed: false,
+        close_price:42.
+    };
+    let node4 = BufferNode {
+        ts: latest_timestamp - Duration::milliseconds(800),
+        value: 4.0,
+        confirmed: true,
+        close_price:42.
+    };
+    let node5 = BufferNode {
+        ts: latest_timestamp - Duration::milliseconds(550),
+        value: 1.0,
+        confirmed: false,
+        close_price:42.
+    };
+    let node6 = BufferNode {
+        ts: latest_timestamp - Duration::milliseconds(300),
+        value: 2.0,
+        confirmed: false,
+        close_price:42.
+    };
+    let node7 = BufferNode {
+        ts: latest_timestamp - Duration::milliseconds(50),
+        value: 3.0,
+        confirmed: false,
+        close_price:42.
+    };
+
+    let nodes = vec![node0, node1, node2, node3, node4, node5, node6, node7];
+    let mut buffer = CircularBuffer::<244, BufferNode>::new();
+
+    for node in nodes {
+        buffer.push_back(node)
+    }
+    // copy buffer to make sure the final state is equal to the original one
+    let buffer_backup = buffer.clone();
+    // test for 2 seconds
+    let volume_delta_over_2_seconds = calc_volume_delta(&mut buffer, 2);
+    assert_eq!(volume_delta_over_2_seconds, 6.0);
+    assert_eq!(buffer, buffer_backup);
+    // test for 3 seconds - now the node at position 0 should be included
+    let volume_delta_over_3_seconds = calc_volume_delta(&mut buffer, 3);
+    assert_eq!(volume_delta_over_3_seconds, 6.9);
+    assert_eq!(buffer, buffer_backup);
+}
