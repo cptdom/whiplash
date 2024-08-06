@@ -20,7 +20,5 @@ I wanted a Rust exercise with a real use-case. This project at the moment is not
 #### TODO:
 - config per symbol, not global
 - config validation
-- unit tests for all circular buffer iterations to ensure correct calculations
 - Dockerfile
-- integration tests using a mock server and docker compose
 - CI GHA
