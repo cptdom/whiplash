@@ -19,5 +19,4 @@ I wanted a Rust exercise with a real use-case. This project at the moment is not
 
 #### TODO:
 - config per symbol, not global
-- Dockerfile
 - CI GHA
