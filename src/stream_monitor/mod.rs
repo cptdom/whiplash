@@ -109,11 +109,11 @@ pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<()> {
     drop(handler);
 
     let monitoring_handle = tokio::spawn(async move {
-        let mut interval = interval(Duration::from_secs(1));
         info!("allowing {:?} seconds to populate buffer for {}", WARMUP_WINDOW_SECONDS, s);
         task::sleep(Duration::from_secs(WARMUP_WINDOW_SECONDS as u64)).await;
+        let mut interval = interval(Duration::from_secs(1));
         loop {
-            interval.tick().await;
+            interval.tick().await; // IMPORTANT NOTE: if ticks are missed, they ACCUMULATE!!!
             let handler = monitoring_clone.lock().await;
             let buffer_copy = handler.buffer.clone();
             drop(handler);
