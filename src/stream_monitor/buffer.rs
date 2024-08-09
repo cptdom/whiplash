@@ -46,25 +46,20 @@ fn parse_kline_event(event: &Event) -> Result<(f64, f64)> {
     Ok((event_size, price_close))
 }
 
-pub fn calc_volume_delta(buffer: &mut SymbolBuffer, needed_seconds: i64) -> f64 {
+pub fn calc_volume_delta(buffer: &SymbolBuffer, needed_seconds: i64) -> f64 {
     // info!("CVD: {:?}", buffer);
     // calculate the stop time
     let latest_timestamp = buffer.back().map(|node| node.ts).unwrap_or(Utc::now());
     let stop_time = latest_timestamp - Duration::seconds(needed_seconds);
 
     let mut total_volume_delta = 0.0;
-    let mut iter = 0;
-
-    // store nodes temporarily during iteration
-    let mut temp_nodes = Vec::new();
 
     // go backwards
-    while let Some(current_node) = buffer.pop_back() {
+    for (iter, current_node) in buffer.iter().rev().enumerate() {
         // backup and peek ahead
         let current_node = current_node.clone();
-        temp_nodes.push(current_node.clone());
 
-        if let Some(previous_node) = buffer.back() {
+        if let Some(previous_node) = buffer.iter().rev().nth(iter + 1) {
             if previous_node.ts <= stop_time || (previous_node.ts == latest_timestamp && iter != 0) {
                 break;
             }
@@ -74,14 +69,7 @@ pub fn calc_volume_delta(buffer: &mut SymbolBuffer, needed_seconds: i64) -> f64 
             } else {
                 total_volume_delta += current_node.value - previous_node.value;
             }
-
-            iter += 1;
         }
-    }
-
-    // restore the buffer to its original state by re-pushing the popped nodes
-    while let Some(node) = temp_nodes.pop() {
-        buffer.push_back(node);
     }
 
     total_volume_delta

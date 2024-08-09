@@ -115,17 +115,17 @@ pub async fn run(handler: Arc<Mutex<SymbolData>>) -> Result<()> {
         loop {
             interval.tick().await;
             let handler = monitoring_clone.lock().await;
-            let mut buffer_copy = handler.buffer.clone();
+            let buffer_copy = handler.buffer.clone();
             drop(handler);
             // calculate atr
             let atr_result = atr::check_atr_condition(
-                &mut buffer_copy, // Mutable reference to buffer
+                &buffer_copy,
                 ATR_CHECK_WINDOW_SECONDS,
                 at,
                 am
             );
             // get volume delta for the period
-            let vol_usdt = buffer::calc_volume_delta(&mut buffer_copy, ATR_CHECK_WINDOW_SECONDS as i64);
+            let vol_usdt = buffer::calc_volume_delta(&buffer_copy, ATR_CHECK_WINDOW_SECONDS as i64);
 
             // Handle the ATR result as needed
             match atr_result {

@@ -12,7 +12,7 @@ pub struct ATRInputData {
 
 
 pub fn check_atr_condition(
-    buffer: &mut SymbolBuffer,
+    buffer: &SymbolBuffer,
     seconds: usize,
     atr_threshold: f64,
     atr_min_candles_percent: f64
@@ -55,12 +55,10 @@ fn calculate_atr(input: &ATRInputData, seconds: usize) -> Result<f64, Box<dyn Er
 
 }
 
-fn get_atr_data(buffer: &mut SymbolBuffer, seconds: usize) -> Result<ATRInputData, Box<dyn Error>> {
+fn get_atr_data(buffer: &SymbolBuffer, seconds: usize) -> Result<ATRInputData, Box<dyn Error>> {
     if seconds > 60 {
         return Err("requested interval exceeds minute buffer length".into());
     }
-
-    let saved_buffer_pointer = buffer.clone();
 
     let latest_timestamp = buffer.back().map(|node| node.ts).unwrap_or(Utc::now());
     let stop_time = latest_timestamp - Duration::seconds(seconds as i64);
@@ -70,11 +68,7 @@ fn get_atr_data(buffer: &mut SymbolBuffer, seconds: usize) -> Result<ATRInputDat
     let mut highs_map = HashMap::new();
     let mut closes_map = HashMap::new();
 
-    let mut iter = 0;
-    while let Some(current_node) = buffer.back() {
-        let current_node = current_node.clone();
-        buffer.pop_back();
-
+    for (iter, current_node) in buffer.iter().rev().enumerate() {
         let current_second = current_node.ts.second() as i32;
 
         if key_order.is_empty() || *key_order.last().unwrap() != current_second {
@@ -95,17 +89,12 @@ fn get_atr_data(buffer: &mut SymbolBuffer, seconds: usize) -> Result<ATRInputDat
             *low_entry = current_node.close_price;
         }
 
-        if let Some(previous_node) = buffer.back() {
+        if let Some(previous_node) = buffer.iter().rev().nth(iter + 1) {
             if previous_node.ts <= stop_time || (previous_node.ts == latest_timestamp && iter != 0) {
                 break;
             }
         }
-
-        iter += 1;
     }
-
-    // restore original position
-    *buffer = saved_buffer_pointer;
 
     key_order.reverse();
 
